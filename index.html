@@ -13,6 +13,10 @@
 <link rel="icon" href="./icon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,wght@0,400;0,500;0,600;1,400&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="./firebase-config.js"></script>
 <style>
   :root{
     --paper:#E8E4D9;
@@ -47,7 +51,7 @@
     display:flex;
     align-items:baseline;
     justify-content:space-between;
-    margin-bottom:22px;
+    margin-bottom:14px;
     flex-wrap:wrap;
     gap:8px;
   }
@@ -62,6 +66,43 @@
     font-size:13px;
     color:var(--ink-soft);
   }
+
+  /* ---------- Sync bar ---------- */
+  .sync-bar{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    flex-wrap:wrap;
+    font-size:12.5px;
+    color:var(--ink-soft);
+    background:var(--paper-soft);
+    border:1px solid var(--line);
+    border-radius:8px;
+    padding:8px 12px;
+    margin-bottom:22px;
+  }
+  .sync-dot{
+    width:8px;height:8px;border-radius:50%;
+    background:#9A9484;
+    flex-shrink:0;
+  }
+  .sync-dot.on{background:#4C8B63;}
+  .sync-dot.off{background:#B0503F;}
+  .sync-bar button{
+    appearance:none;border:1px solid var(--line);background:var(--card);
+    color:var(--ink); font-family:'Inter',sans-serif; font-size:12px;
+    padding:4px 9px; border-radius:6px; cursor:pointer;
+  }
+  .sync-bar input[type=text]{
+    border:1px solid var(--line); background:var(--card);
+    border-radius:6px; padding:4px 8px; font-size:12px; font-family:'Inter',sans-serif;
+    width:150px; outline:none;
+  }
+  .sync-bar code{
+    background:var(--card); border:1px solid var(--line); border-radius:5px;
+    padding:2px 6px; font-size:11.5px;
+  }
+
   nav.tabs{
     display:flex;
     gap:2px;
@@ -127,6 +168,7 @@
     align-items:center;
     margin-top:8px;
   }
+  .composer .hint{font-size:11px; color:var(--ink-soft); opacity:0.8;}
   .swatches{display:flex; gap:6px;}
   .swatch{
     width:18px;height:18px;border-radius:50%;
@@ -350,6 +392,57 @@
   li.day-item button:hover{color:var(--brick);}
   .loading-msg{color:var(--ink-soft); font-size:13.5px; font-style:italic; padding:10px 2px;}
   ::placeholder{color:#A7A192;}
+
+  /* ---------- Context menu ---------- */
+  .context-menu{
+    position:fixed;
+    display:none;
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:8px;
+    box-shadow:var(--shadow);
+    padding:4px;
+    z-index:1000;
+    min-width:130px;
+  }
+  .context-menu button{
+    display:block;
+    width:100%;
+    text-align:left;
+    appearance:none;border:none;background:none;
+    padding:8px 10px;
+    font-family:'Inter',sans-serif;
+    font-size:13.5px;
+    color:var(--ink);
+    cursor:pointer;
+    border-radius:5px;
+  }
+  .context-menu button:hover{background:var(--paper-soft);}
+  .context-menu button.danger:hover{color:var(--brick);}
+
+  /* ---------- Inline edit controls ---------- */
+  .edit-btn{
+    background:none; border:none; color:var(--ink-soft);
+    font-family:'Inter',sans-serif; cursor:pointer;
+  }
+  .note-card .edit-title{
+    width:100%; border:none; background:transparent;
+    font-family:'Source Serif 4', serif; font-weight:600; font-size:15.5px;
+    margin-bottom:6px; outline:none; border-bottom:1px solid var(--line); padding-bottom:4px;
+  }
+  .note-card .edit-body{
+    width:100%; border:none; background:transparent; resize:vertical; min-height:60px;
+    font-family:'Inter',sans-serif; font-size:13.5px; outline:none; line-height:1.5; margin-bottom:8px;
+  }
+  .ghost-btn{
+    appearance:none; border:1px solid var(--line); background:var(--card); color:var(--ink-soft);
+    font-family:'Inter',sans-serif; font-size:12.5px; padding:6px 12px; border-radius:7px; cursor:pointer;
+  }
+  .edit-row{display:flex; justify-content:space-between; align-items:center; margin-top:8px; gap:8px; flex-wrap:wrap;}
+  .inline-edit-input{
+    flex:1; border:1px solid var(--line); border-radius:6px; background:var(--paper-soft);
+    padding:6px 8px; font-family:'Inter',sans-serif; font-size:14px; outline:none;
+  }
 </style>
 </head>
 <body>
@@ -358,6 +451,14 @@
     <h1>My Notebook</h1>
     <div class="today" id="todayLabel"></div>
   </header>
+
+  <div class="sync-bar" id="syncBar">
+    <div class="sync-dot" id="syncDot"></div>
+    <span id="syncStatus">Checking sync...</span>
+    <button id="copyCodeBtn" style="display:none;">Copy sync code</button>
+    <input type="text" id="pasteCodeInput" placeholder="Paste code from other device" style="display:none;">
+    <button id="useCodeBtn" style="display:none;">Link device</button>
+  </div>
 
   <nav class="tabs">
     <button data-view="journal" class="active">Journal</button>
@@ -372,7 +473,10 @@
       <textarea id="noteBody" placeholder="Write what's on your mind..."></textarea>
       <div class="row">
         <div class="swatches" id="swatches"></div>
-        <button class="primary" id="addNoteBtn">Save note</button>
+        <div style="display:flex; align-items:center; gap:10px;">
+          <span class="hint">Enter to save &middot; Shift+Enter for a new line</span>
+          <button class="primary" id="addNoteBtn">Save note</button>
+        </div>
       </div>
     </div>
     <div id="journalStatus" class="loading-msg">Loading your notes...</div>
@@ -382,7 +486,7 @@
   <!-- TASKS -->
   <section class="view" id="view-tasks">
     <div class="task-add">
-      <input type="text" id="taskInput" placeholder="Add a task...">
+      <input type="text" id="taskInput" placeholder="Add a task, then press Enter...">
       <input type="date" id="taskDate">
       <button class="primary" id="addTaskBtn">Add</button>
     </div>
@@ -407,12 +511,17 @@
     <div class="day-panel" id="dayPanel" style="display:none;">
       <h3 id="dayPanelTitle"></h3>
       <div class="day-add">
-        <input type="text" id="dayItemInput" placeholder="Add something for this day...">
+        <input type="text" id="dayItemInput" placeholder="Add something for this day, then press Enter...">
         <button class="primary" id="dayItemAddBtn">Add</button>
       </div>
       <ul class="day-items" id="dayItemsList"></ul>
     </div>
   </section>
+</div>
+
+<div class="context-menu" id="contextMenu">
+  <button id="ctxEdit">Edit</button>
+  <button id="ctxDelete" class="danger">Delete</button>
 </div>
 
 <script>
@@ -422,10 +531,15 @@
 
   let notes = [];
   let tasks = [];
-  let events = {}; // { 'YYYY-MM-DD': [ {id, text} ] }
+  let events = {};
   let taskFilter = 'all';
   let calDate = new Date();
   let selectedDay = null;
+
+  let editingNoteId = null;
+  let editingTaskId = null;
+  let editingDayItemId = null;
+  let ctxTarget = null;
 
   const $ = (sel, root=document) => root.querySelector(sel);
   const $$ = (sel, root=document) => Array.from(root.querySelectorAll(sel));
@@ -434,43 +548,126 @@
   function pad(n){ return n.toString().padStart(2,'0'); }
   function dateKey(d){ return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()); }
 
-  // ---------- Storage helpers ----------
-  // Works two ways: inside Claude's artifact preview it uses window.storage
-  // (syncs across your devices via Claude). Installed standalone as your own
-  // app, it uses the browser's localStorage on that device instead.
   const hasClaudeStorage = (typeof window !== 'undefined' && !!window.storage);
 
-  async function loadKey(key, fallback){
+  let db = null, auth = null, notebookId = null, syncEnabled = false;
+  let lastPushedAt = 0;
+  let pushTimer = null;
+
+  async function saveLocal(key, value){
+    if(hasClaudeStorage){
+      try{ await window.storage.set(key, JSON.stringify(value), false); return; }
+      catch(e){ }
+    }
+    try{ localStorage.setItem(key, JSON.stringify(value)); }
+    catch(e){ console.error('Local save failed for', key, e); }
+  }
+
+  async function loadLocal(key, fallback){
     if(hasClaudeStorage){
       try{
         const res = await window.storage.get(key, false);
-        if(res && res.value){ return JSON.parse(res.value); }
+        if(res && res.value) return JSON.parse(res.value);
         return fallback;
-      }catch(e){ /* fall through to localStorage */ }
+      }catch(e){ }
     }
     try{
       const raw = localStorage.getItem(key);
       return raw ? JSON.parse(raw) : fallback;
-    }catch(e){
-      return fallback;
-    }
+    }catch(e){ return fallback; }
   }
 
   async function saveKey(key, value){
-    if(hasClaudeStorage){
-      try{
-        await window.storage.set(key, JSON.stringify(value), false);
-        return;
-      }catch(e){ /* fall through to localStorage */ }
-    }
+    await saveLocal(key, value);
+    schedulePush();
+  }
+
+  function schedulePush(){
+    if(!syncEnabled) return;
+    clearTimeout(pushTimer);
+    pushTimer = setTimeout(pushToRemote, 400);
+  }
+
+  async function pushToRemote(){
+    if(!syncEnabled || !db || !notebookId) return;
+    const ts = Date.now();
+    lastPushedAt = ts;
     try{
-      localStorage.setItem(key, JSON.stringify(value));
+      await db.collection('notebooks').doc(notebookId).set({
+        notes, tasks, events, updatedAt: ts
+      }, { merge:true });
     }catch(e){
-      console.error('Save failed for', key, e);
+      console.error('Sync push failed', e);
     }
   }
 
-  // ---------- Init ----------
+  function setSyncUI(state, label){
+    const dot = $('#syncDot');
+    dot.className = 'sync-dot ' + (state === 'on' ? 'on' : state === 'off' ? 'off' : '');
+    $('#syncStatus').textContent = label;
+  }
+
+  async function initSync(){
+    const cfg = window.FIREBASE_CONFIG;
+    if(!cfg || !cfg.apiKey || cfg.apiKey.indexOf('PASTE') === 0){
+      setSyncUI('', 'Sync not set up yet — see README.txt to enable it');
+      return;
+    }
+    if(typeof firebase === 'undefined'){
+      setSyncUI('off', 'Sync unavailable right now (offline?) — using local copy');
+      return;
+    }
+    try{
+      firebase.initializeApp(cfg);
+      auth = firebase.auth();
+      db = firebase.firestore();
+      await auth.signInAnonymously();
+
+      notebookId = localStorage.getItem('notebookId');
+      if(!notebookId){
+        notebookId = (crypto.randomUUID ? crypto.randomUUID() : uid()+uid()+uid());
+        localStorage.setItem('notebookId', notebookId);
+      }
+      syncEnabled = true;
+      setSyncUI('on', 'Synced');
+      $('#copyCodeBtn').style.display = 'inline-block';
+      $('#pasteCodeInput').style.display = 'inline-block';
+      $('#useCodeBtn').style.display = 'inline-block';
+
+      db.collection('notebooks').doc(notebookId).onSnapshot((doc)=>{
+        if(!doc.exists) return;
+        const data = doc.data();
+        if(!data || !data.updatedAt || data.updatedAt === lastPushedAt) return;
+        if(data.notes){ notes = data.notes; renderNotes(); saveLocal('journal:entries', notes); }
+        if(data.tasks){ tasks = data.tasks; renderTasks(); saveLocal('tasks:list', tasks); }
+        if(data.events){ events = data.events; renderCalendar(); if(selectedDay) renderDayItems(selectedDay); saveLocal('calendar:events', events); }
+        setSyncUI('on', 'Synced just now');
+      });
+    }catch(e){
+      console.error('Sync setup failed', e);
+      setSyncUI('off', 'Sync setup failed — check firebase-config.js and README.txt');
+    }
+  }
+
+  function bindSyncUI(){
+    $('#copyCodeBtn').addEventListener('click', async ()=>{
+      if(!notebookId) return;
+      try{
+        await navigator.clipboard.writeText(notebookId);
+        setSyncUI('on', 'Code copied — paste it on your other device');
+      }catch(e){
+        prompt('Copy this code and enter it on your other device:', notebookId);
+      }
+    });
+    $('#useCodeBtn').addEventListener('click', async ()=>{
+      const code = $('#pasteCodeInput').value.trim();
+      if(!code) return;
+      localStorage.setItem('notebookId', code);
+      setSyncUI('', 'Linking device...');
+      location.reload();
+    });
+  }
+
   async function init(){
     const today = new Date();
     $('#todayLabel').textContent = today.toLocaleDateString(undefined, { weekday:'long', year:'numeric', month:'long', day:'numeric' });
@@ -480,21 +677,24 @@
     bindJournal();
     bindTasks();
     bindCalendar();
+    bindSyncUI();
+    bindContextMenu();
 
-    notes = await loadKey('journal:entries', []);
+    notes = await loadLocal('journal:entries', []);
     $('#journalStatus').style.display = 'none';
     renderNotes();
 
-    tasks = await loadKey('tasks:list', []);
+    tasks = await loadLocal('tasks:list', []);
     $('#tasksStatus').style.display = 'none';
     renderTasks();
 
-    events = await loadKey('calendar:events', {});
+    events = await loadLocal('calendar:events', {});
     $('#calStatus').style.display = 'none';
     renderCalendar();
+
+    initSync();
   }
 
-  // ---------- Tabs ----------
   function bindTabs(){
     $$('nav.tabs button').forEach(btn=>{
       btn.addEventListener('click', ()=>{
@@ -506,7 +706,66 @@
     });
   }
 
-  // ---------- Journal ----------
+  function openContextMenu(x, y, target){
+    ctxTarget = target;
+    const menu = $('#contextMenu');
+    menu.style.display = 'block';
+    const rect = menu.getBoundingClientRect();
+    const vx = Math.min(x, window.innerWidth - rect.width - 8);
+    const vy = Math.min(y, window.innerHeight - rect.height - 8);
+    menu.style.left = Math.max(4, vx) + 'px';
+    menu.style.top = Math.max(4, vy) + 'px';
+  }
+
+  function closeContextMenu(){
+    ctxTarget = null;
+    $('#contextMenu').style.display = 'none';
+  }
+
+  function bindContextMenu(){
+    $('#notesGrid').addEventListener('contextmenu', (e)=>{
+      const card = e.target.closest('.note-card');
+      if(!card || !card.dataset.id) return;
+      e.preventDefault();
+      openContextMenu(e.clientX, e.clientY, { type:'note', id: card.dataset.id });
+    });
+    $('#taskList').addEventListener('contextmenu', (e)=>{
+      const li = e.target.closest('li.task');
+      if(!li || !li.dataset.id) return;
+      e.preventDefault();
+      openContextMenu(e.clientX, e.clientY, { type:'task', id: li.dataset.id });
+    });
+    $('#dayItemsList').addEventListener('contextmenu', (e)=>{
+      const li = e.target.closest('li.day-item');
+      if(!li || !li.dataset.id) return;
+      e.preventDefault();
+      openContextMenu(e.clientX, e.clientY, { type:'dayitem', id: li.dataset.id });
+    });
+
+    document.addEventListener('click', closeContextMenu);
+    document.addEventListener('scroll', closeContextMenu, true);
+    window.addEventListener('resize', closeContextMenu);
+
+    $('#ctxEdit').addEventListener('click', (e)=>{
+      e.stopPropagation();
+      if(!ctxTarget) return;
+      const { type, id } = ctxTarget;
+      closeContextMenu();
+      if(type === 'note') startEditNote(id);
+      if(type === 'task') startEditTask(id);
+      if(type === 'dayitem') startEditDayItem(id);
+    });
+    $('#ctxDelete').addEventListener('click', async (e)=>{
+      e.stopPropagation();
+      if(!ctxTarget) return;
+      const { type, id } = ctxTarget;
+      closeContextMenu();
+      if(type === 'note') await deleteNote(id);
+      if(type === 'task') await deleteTask(id);
+      if(type === 'dayitem' && selectedDay) await deleteDayItem(selectedDay, id);
+    });
+  }
+
   function buildSwatches(){
     const wrap = $('#swatches');
     NOTE_COLORS.forEach((c,i)=>{
@@ -525,8 +784,6 @@
   function bindJournal(){
     $('#addNoteBtn').addEventListener('click', saveNote);
 
-    // Title field: Enter moves down into the body instead of submitting,
-    // since a title alone is rarely the whole thought.
     $('#noteTitle').addEventListener('keydown', (e)=>{
       if(e.key === 'Enter'){
         e.preventDefault();
@@ -534,7 +791,6 @@
       }
     });
 
-    // Body field: Enter saves the note, Shift+Enter inserts a real line break.
     $('#noteBody').addEventListener('keydown', (e)=>{
       if(e.key === 'Enter' && !e.shiftKey){
         e.preventDefault();
@@ -565,25 +821,85 @@
     notes.forEach(note=>{
       const card = document.createElement('div');
       card.className = 'note-card';
+      card.dataset.id = note.id;
       card.style.background = note.color || '#FFFDF8';
+
+      if(note.id === editingNoteId){
+        card.innerHTML = `
+          <input type="text" class="edit-title" placeholder="Title (optional)">
+          <textarea class="edit-body" placeholder="Write what's on your mind..."></textarea>
+          <div class="edit-row">
+            <span class="hint">Enter to save &middot; Shift+Enter for a new line &middot; Esc to cancel</span>
+            <div style="display:flex; gap:6px;">
+              <button class="ghost-btn cancel-edit">Cancel</button>
+              <button class="primary save-edit">Save</button>
+            </div>
+          </div>
+        `;
+        const titleInput = card.querySelector('.edit-title');
+        const bodyInput = card.querySelector('.edit-body');
+        titleInput.value = note.title || '';
+        bodyInput.value = note.body || '';
+
+        const commit = ()=>saveEditNote(note.id, titleInput.value, bodyInput.value);
+        const cancel = ()=>{ editingNoteId = null; renderNotes(); };
+
+        titleInput.addEventListener('keydown', (e)=>{
+          if(e.key === 'Enter'){ e.preventDefault(); bodyInput.focus(); }
+          if(e.key === 'Escape'){ e.preventDefault(); cancel(); }
+        });
+        bodyInput.addEventListener('keydown', (e)=>{
+          if(e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); commit(); }
+          if(e.key === 'Escape'){ e.preventDefault(); cancel(); }
+        });
+        card.querySelector('.save-edit').addEventListener('click', commit);
+        card.querySelector('.cancel-edit').addEventListener('click', cancel);
+
+        grid.appendChild(card);
+        titleInput.focus();
+        return;
+      }
+
       const dateStr = new Date(note.created).toLocaleDateString(undefined, {month:'short', day:'numeric'});
       card.innerHTML = `
         ${note.title ? `<h3></h3>` : ''}
         <p></p>
-        <div class="meta"><span>${dateStr}</span><button title="Delete">Delete</button></div>
+        <div class="meta"><span>${dateStr}</span><span><button class="edit-btn">Edit</button> <button title="Delete">Delete</button></span></div>
       `;
       if(note.title) card.querySelector('h3').textContent = note.title;
       card.querySelector('p').textContent = note.body;
-      card.querySelector('button').addEventListener('click', async ()=>{
-        notes = notes.filter(n=>n.id !== note.id);
-        renderNotes();
-        await saveKey('journal:entries', notes);
-      });
+      card.querySelector('.edit-btn').addEventListener('click', ()=>startEditNote(note.id));
+      card.querySelector('[title="Delete"]').addEventListener('click', ()=>deleteNote(note.id));
       grid.appendChild(card);
     });
   }
 
-  // ---------- Tasks ----------
+  function startEditNote(id){
+    editingNoteId = id;
+    renderNotes();
+  }
+
+  async function saveEditNote(id, titleVal, bodyVal){
+    if(editingNoteId !== id) return;
+    const note = notes.find(n=>n.id === id);
+    const title = titleVal.trim();
+    const body = bodyVal.trim();
+    if(note && (title || body)){
+      note.title = title;
+      note.body = body;
+    }
+    editingNoteId = null;
+    renderNotes();
+    await saveKey('journal:entries', notes);
+  }
+
+  async function deleteNote(id){
+    notes = notes.filter(n=>n.id !== id);
+    if(editingNoteId === id) editingNoteId = null;
+    renderNotes();
+    await saveKey('journal:entries', notes);
+  }
+
   function bindTasks(){
     $('#addTaskBtn').addEventListener('click', addTask);
     $('#taskInput').addEventListener('keydown', (e)=>{ if(e.key === 'Enter') addTask(); });
@@ -623,6 +939,28 @@
     visible.forEach(task=>{
       const li = document.createElement('li');
       li.className = 'task' + (task.done ? ' done' : '');
+      li.dataset.id = task.id;
+
+      if(task.id === editingTaskId){
+        li.innerHTML = `
+          <div class="check" style="visibility:hidden;"></div>
+          <div class="body"><input type="text" class="inline-edit-input edit-task-input"></div>
+        `;
+        const input = li.querySelector('.edit-task-input');
+        input.value = task.text;
+        const commit = ()=>saveEditTask(task.id, input.value);
+        const cancel = ()=>{ editingTaskId = null; renderTasks(); };
+        input.addEventListener('keydown', (e)=>{
+          if(e.key === 'Enter'){ e.preventDefault(); commit(); }
+          if(e.key === 'Escape'){ e.preventDefault(); cancel(); }
+        });
+        input.addEventListener('blur', commit);
+        list.appendChild(li);
+        input.focus();
+        input.select();
+        return;
+      }
+
       li.innerHTML = `
         <div class="check">
           <svg viewBox="0 0 24 24" fill="none"><path d="M4 12l5 5L20 6" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -631,6 +969,7 @@
           <div class="title"></div>
           ${task.due ? `<div class="due"></div>` : ''}
         </div>
+        <button class="edit-btn" title="Edit">Edit</button>
         <button class="remove" title="Delete">&times;</button>
       `;
       li.querySelector('.title').textContent = task.text;
@@ -642,16 +981,34 @@
         renderTasks();
         await saveKey('tasks:list', tasks);
       });
-      li.querySelector('.remove').addEventListener('click', async ()=>{
-        tasks = tasks.filter(t=>t.id !== task.id);
-        renderTasks();
-        await saveKey('tasks:list', tasks);
-      });
+      li.querySelector('.edit-btn').addEventListener('click', ()=>startEditTask(task.id));
+      li.querySelector('.remove').addEventListener('click', ()=>deleteTask(task.id));
       list.appendChild(li);
     });
   }
 
-  // ---------- Calendar ----------
+  function startEditTask(id){
+    editingTaskId = id;
+    renderTasks();
+  }
+
+  async function saveEditTask(id, newText){
+    if(editingTaskId !== id) return;
+    const task = tasks.find(t=>t.id === id);
+    const trimmed = newText.trim();
+    if(task && trimmed) task.text = trimmed;
+    editingTaskId = null;
+    renderTasks();
+    await saveKey('tasks:list', tasks);
+  }
+
+  async function deleteTask(id){
+    tasks = tasks.filter(t=>t.id !== id);
+    if(editingTaskId === id) editingTaskId = null;
+    renderTasks();
+    await saveKey('tasks:list', tasks);
+  }
+
   function bindCalendar(){
     $('#prevMonth').addEventListener('click', ()=>{
       calDate.setMonth(calDate.getMonth()-1);
@@ -727,17 +1084,55 @@
     items.forEach(item=>{
       const li = document.createElement('li');
       li.className = 'day-item';
-      li.innerHTML = `<span></span><button>&times;</button>`;
+      li.dataset.id = item.id;
+
+      if(item.id === editingDayItemId){
+        li.innerHTML = `<input type="text" class="inline-edit-input edit-dayitem-input">`;
+        const input = li.querySelector('.edit-dayitem-input');
+        input.value = item.text;
+        const commit = ()=>saveEditDayItem(key, item.id, input.value);
+        const cancel = ()=>{ editingDayItemId = null; renderDayItems(key); };
+        input.addEventListener('keydown', (e)=>{
+          if(e.key === 'Enter'){ e.preventDefault(); commit(); }
+          if(e.key === 'Escape'){ e.preventDefault(); cancel(); }
+        });
+        input.addEventListener('blur', commit);
+        list.appendChild(li);
+        input.focus();
+        input.select();
+        return;
+      }
+
+      li.innerHTML = `<span></span><span><button class="edit-btn" title="Edit">Edit</button> <button title="Delete">&times;</button></span>`;
       li.querySelector('span').textContent = item.text;
-      li.querySelector('button').addEventListener('click', async ()=>{
-        events[key] = events[key].filter(i=>i.id !== item.id);
-        if(events[key].length === 0) delete events[key];
-        renderDayItems(key);
-        renderCalendar();
-        await saveKey('calendar:events', events);
-      });
+      li.querySelector('.edit-btn').addEventListener('click', ()=>startEditDayItem(item.id));
+      li.querySelector('[title="Delete"]').addEventListener('click', ()=>deleteDayItem(key, item.id));
       list.appendChild(li);
     });
+  }
+
+  function startEditDayItem(id){
+    editingDayItemId = id;
+    renderDayItems(selectedDay);
+  }
+
+  async function saveEditDayItem(key, id, newText){
+    if(editingDayItemId !== id) return;
+    const item = (events[key] || []).find(i=>i.id === id);
+    const trimmed = newText.trim();
+    if(item && trimmed) item.text = trimmed;
+    editingDayItemId = null;
+    renderDayItems(key);
+    await saveKey('calendar:events', events);
+  }
+
+  async function deleteDayItem(key, id){
+    events[key] = (events[key] || []).filter(i=>i.id !== id);
+    if(events[key].length === 0) delete events[key];
+    if(editingDayItemId === id) editingDayItemId = null;
+    renderDayItems(key);
+    renderCalendar();
+    await saveKey('calendar:events', events);
   }
 
   async function addDayItem(){
@@ -757,7 +1152,7 @@
 
   if('serviceWorker' in navigator){
     window.addEventListener('load', ()=>{
-      navigator.serviceWorker.register('./sw.js').catch(()=>{ /* fine if unsupported, e.g. inside Claude preview */ });
+      navigator.serviceWorker.register('./sw.js').catch(()=>{ });
     });
   }
 })();
