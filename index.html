@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>My Notebook</title>
+<link rel="manifest" href="./manifest.json">
+<meta name="theme-color" content="#2B4570">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Notebook">
+<link rel="apple-touch-icon" href="./icon.svg">
+<link rel="icon" href="./icon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,wght@0,400;0,500;0,600;1,400&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#E8E4D9;
+    --paper-soft:#F1EEE5;
+    --card:#FFFDF8;
+    --ink:#232320;
+    --ink-soft:#5B564C;
+    --navy:#2B4570;
+    --navy-soft:#5E7295;
+    --brick:#B0503F;
+    --brick-soft:#D98A7A;
+    --line:#D8D2C2;
+    --shadow: 0 1px 2px rgba(35,35,32,0.06), 0 4px 14px rgba(35,35,32,0.05);
+    --radius: 10px;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'Inter',sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .app{
+    max-width:760px;
+    margin:0 auto;
+    padding:28px 20px 80px;
+    min-height:100%;
+  }
+  header.top{
+    display:flex;
+    align-items:baseline;
+    justify-content:space-between;
+    margin-bottom:22px;
+    flex-wrap:wrap;
+    gap:8px;
+  }
+  header.top h1{
+    font-family:'Source Serif 4', serif;
+    font-weight:600;
+    font-size:26px;
+    margin:0;
+    letter-spacing:-0.01em;
+  }
+  header.top .today{
+    font-size:13px;
+    color:var(--ink-soft);
+  }
+  nav.tabs{
+    display:flex;
+    gap:2px;
+    margin-bottom:26px;
+    border-bottom:1px solid var(--line);
+  }
+  nav.tabs button{
+    appearance:none;
+    border:none;
+    background:transparent;
+    font-family:'Inter',sans-serif;
+    font-size:14.5px;
+    font-weight:500;
+    color:var(--ink-soft);
+    padding:10px 4px;
+    margin-right:22px;
+    cursor:pointer;
+    position:relative;
+    top:1px;
+  }
+  nav.tabs button.active{
+    color:var(--ink);
+    border-bottom:2px solid var(--navy);
+  }
+  section.view{display:none;}
+  section.view.active{display:block;}
+
+  /* ---------- Journal ---------- */
+  .composer{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    box-shadow:var(--shadow);
+    padding:14px 16px;
+    margin-bottom:20px;
+  }
+  .composer input[type=text]{
+    width:100%;
+    border:none;
+    background:transparent;
+    font-family:'Source Serif 4', serif;
+    font-size:16.5px;
+    font-weight:600;
+    color:var(--ink);
+    margin-bottom:6px;
+    outline:none;
+  }
+  .composer textarea{
+    width:100%;
+    border:none;
+    background:transparent;
+    resize:vertical;
+    min-height:52px;
+    font-family:'Inter',sans-serif;
+    font-size:14.5px;
+    color:var(--ink);
+    outline:none;
+    line-height:1.5;
+  }
+  .composer .row{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-top:8px;
+  }
+  .swatches{display:flex; gap:6px;}
+  .swatch{
+    width:18px;height:18px;border-radius:50%;
+    border:1.5px solid rgba(0,0,0,0.15);
+    cursor:pointer;
+  }
+  .swatch.selected{outline:2px solid var(--navy); outline-offset:2px;}
+  button.primary{
+    appearance:none;
+    border:none;
+    background:var(--navy);
+    color:#fff;
+    font-family:'Inter',sans-serif;
+    font-size:13.5px;
+    font-weight:600;
+    padding:8px 16px;
+    border-radius:7px;
+    cursor:pointer;
+  }
+  button.primary:hover{background:var(--navy-soft);}
+  .notes-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fill, minmax(210px, 1fr));
+    gap:14px;
+  }
+  .note-card{
+    border-radius:var(--radius);
+    padding:14px 15px;
+    box-shadow:var(--shadow);
+    border:1px solid var(--line);
+    display:flex;
+    flex-direction:column;
+    min-height:90px;
+  }
+  .note-card h3{
+    font-family:'Source Serif 4', serif;
+    font-size:15.5px;
+    font-weight:600;
+    margin:0 0 6px;
+  }
+  .note-card p{
+    font-size:13.5px;
+    line-height:1.5;
+    color:var(--ink-soft);
+    margin:0 0 10px;
+    white-space:pre-wrap;
+    flex:1;
+  }
+  .note-card .meta{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    font-size:11px;
+    color:var(--ink-soft);
+    opacity:0.75;
+  }
+  .note-card .meta button{
+    appearance:none;
+    border:none;
+    background:transparent;
+    color:var(--ink-soft);
+    cursor:pointer;
+    font-size:12px;
+    padding:2px 4px;
+  }
+  .note-card .meta button:hover{color:var(--brick);}
+
+  /* ---------- Tasks ---------- */
+  .task-add{
+    display:flex;
+    gap:8px;
+    margin-bottom:18px;
+  }
+  .task-add input[type=text]{
+    flex:1;
+    border:1px solid var(--line);
+    background:var(--card);
+    border-radius:7px;
+    padding:10px 12px;
+    font-family:'Inter',sans-serif;
+    font-size:14px;
+    outline:none;
+  }
+  .task-add input[type=date]{
+    border:1px solid var(--line);
+    background:var(--card);
+    border-radius:7px;
+    padding:9px 8px;
+    font-family:'Inter',sans-serif;
+    font-size:13px;
+    outline:none;
+    color:var(--ink-soft);
+  }
+  .task-filters{
+    display:flex;
+    gap:14px;
+    margin-bottom:14px;
+    font-size:13px;
+  }
+  .task-filters button{
+    appearance:none;background:none;border:none;
+    color:var(--ink-soft); cursor:pointer; padding:2px 0;
+    font-family:'Inter',sans-serif;
+  }
+  .task-filters button.active{color:var(--ink); font-weight:600; border-bottom:2px solid var(--brick);}
+  ul.task-list{list-style:none; margin:0; padding:0;}
+  li.task{
+    display:flex;
+    align-items:flex-start;
+    gap:10px;
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:8px;
+    padding:11px 13px;
+    margin-bottom:8px;
+  }
+  li.task .check{
+    width:19px;height:19px;
+    border-radius:5px;
+    border:1.5px solid var(--navy-soft);
+    flex-shrink:0;
+    margin-top:1px;
+    cursor:pointer;
+    display:flex;align-items:center;justify-content:center;
+    background:transparent;
+  }
+  li.task.done .check{background:var(--navy); border-color:var(--navy);}
+  li.task .check svg{display:none; width:12px;height:12px;}
+  li.task.done .check svg{display:block;}
+  li.task .body{flex:1; min-width:0;}
+  li.task .title{font-size:14.5px; line-height:1.4;}
+  li.task.done .title{text-decoration:line-through; color:var(--ink-soft);}
+  li.task .due{font-size:11.5px; color:var(--brick); margin-top:2px;}
+  li.task .remove{
+    appearance:none;border:none;background:none;color:var(--ink-soft);
+    cursor:pointer; font-size:15px; padding:2px 4px;
+  }
+  li.task .remove:hover{color:var(--brick);}
+  .empty{
+    color:var(--ink-soft);
+    font-size:13.5px;
+    padding:20px 4px;
+    font-style:italic;
+  }
+
+  /* ---------- Calendar ---------- */
+  .cal-header{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    margin-bottom:14px;
+  }
+  .cal-header h2{
+    font-family:'Source Serif 4', serif;
+    font-weight:600;
+    font-size:19px;
+    margin:0;
+  }
+  .cal-header .nav-btns button{
+    appearance:none;border:1px solid var(--line);background:var(--card);
+    border-radius:6px; width:30px;height:30px; cursor:pointer; font-size:15px;
+    color:var(--ink);
+  }
+  .cal-grid{
+    display:grid;
+    grid-template-columns:repeat(7, 1fr);
+    gap:5px;
+  }
+  .cal-dow{
+    text-align:center;
+    font-size:11px;
+    color:var(--ink-soft);
+    padding-bottom:4px;
+  }
+  .cal-day{
+    aspect-ratio:1/1;
+    border-radius:8px;
+    border:1px solid var(--line);
+    background:var(--card);
+    padding:6px;
+    cursor:pointer;
+    display:flex;
+    flex-direction:column;
+    justify-content:space-between;
+    font-size:12.5px;
+    position:relative;
+  }
+  .cal-day.empty-day{background:transparent; border:none; cursor:default;}
+  .cal-day.today{border:1.5px solid var(--navy);}
+  .cal-day .num{font-weight:600;}
+  .cal-day .dots{display:flex; gap:3px; flex-wrap:wrap;}
+  .cal-day .dot{width:5px;height:5px;border-radius:50%; background:var(--brick);}
+  .day-panel{
+    margin-top:20px;
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    box-shadow:var(--shadow);
+    padding:16px 18px;
+  }
+  .day-panel h3{
+    font-family:'Source Serif 4', serif;
+    margin:0 0 12px;
+    font-size:16px;
+  }
+  .day-add{display:flex; gap:8px; margin-bottom:12px;}
+  .day-add input{
+    flex:1; border:1px solid var(--line); border-radius:7px;
+    padding:8px 10px; font-family:'Inter',sans-serif; font-size:13.5px; outline:none;
+  }
+  ul.day-items{list-style:none; margin:0; padding:0;}
+  li.day-item{
+    display:flex; justify-content:space-between; align-items:center;
+    padding:7px 2px; border-bottom:1px solid var(--line); font-size:13.5px;
+  }
+  li.day-item:last-child{border-bottom:none;}
+  li.day-item button{
+    appearance:none;border:none;background:none;color:var(--ink-soft);
+    cursor:pointer; font-size:14px;
+  }
+  li.day-item button:hover{color:var(--brick);}
+  .loading-msg{color:var(--ink-soft); font-size:13.5px; font-style:italic; padding:10px 2px;}
+  ::placeholder{color:#A7A192;}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <h1>My Notebook</h1>
+    <div class="today" id="todayLabel"></div>
+  </header>
+
+  <nav class="tabs">
+    <button data-view="journal" class="active">Journal</button>
+    <button data-view="tasks">Tasks</button>
+    <button data-view="calendar">Calendar</button>
+  </nav>
+
+  <!-- JOURNAL -->
+  <section class="view active" id="view-journal">
+    <div class="composer">
+      <input type="text" id="noteTitle" placeholder="Title (optional)">
+      <textarea id="noteBody" placeholder="Write what's on your mind..."></textarea>
+      <div class="row">
+        <div class="swatches" id="swatches"></div>
+        <button class="primary" id="addNoteBtn">Save note</button>
+      </div>
+    </div>
+    <div id="journalStatus" class="loading-msg">Loading your notes...</div>
+    <div class="notes-grid" id="notesGrid"></div>
+  </section>
+
+  <!-- TASKS -->
+  <section class="view" id="view-tasks">
+    <div class="task-add">
+      <input type="text" id="taskInput" placeholder="Add a task...">
+      <input type="date" id="taskDate">
+      <button class="primary" id="addTaskBtn">Add</button>
+    </div>
+    <div class="task-filters">
+      <button data-filter="all" class="active">All</button>
+      <button data-filter="active">Active</button>
+      <button data-filter="done">Done</button>
+    </div>
+    <div id="tasksStatus" class="loading-msg">Loading your tasks...</div>
+    <ul class="task-list" id="taskList"></ul>
+  </section>
+
+  <!-- CALENDAR -->
+  <section class="view" id="view-calendar">
+    <div class="cal-header">
+      <div class="nav-btns"><button id="prevMonth">&#8249;</button></div>
+      <h2 id="calMonthLabel"></h2>
+      <div class="nav-btns"><button id="nextMonth">&#8250;</button></div>
+    </div>
+    <div id="calStatus" class="loading-msg">Loading your calendar...</div>
+    <div class="cal-grid" id="calGrid"></div>
+    <div class="day-panel" id="dayPanel" style="display:none;">
+      <h3 id="dayPanelTitle"></h3>
+      <div class="day-add">
+        <input type="text" id="dayItemInput" placeholder="Add something for this day...">
+        <button class="primary" id="dayItemAddBtn">Add</button>
+      </div>
+      <ul class="day-items" id="dayItemsList"></ul>
+    </div>
+  </section>
+</div>
+
+<script>
+(function(){
+  const NOTE_COLORS = ['#FFFDF8', '#FCE9D8', '#E4EEE0', '#DCE7F2', '#F3DFE2'];
+  let selectedColor = NOTE_COLORS[0];
+
+  let notes = [];
+  let tasks = [];
+  let events = {}; // { 'YYYY-MM-DD': [ {id, text} ] }
+  let taskFilter = 'all';
+  let calDate = new Date();
+  let selectedDay = null;
+
+  const $ = (sel, root=document) => root.querySelector(sel);
+  const $$ = (sel, root=document) => Array.from(root.querySelectorAll(sel));
+
+  function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+  function pad(n){ return n.toString().padStart(2,'0'); }
+  function dateKey(d){ return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()); }
+
+  // ---------- Storage helpers ----------
+  // Works two ways: inside Claude's artifact preview it uses window.storage
+  // (syncs across your devices via Claude). Installed standalone as your own
+  // app, it uses the browser's localStorage on that device instead.
+  const hasClaudeStorage = (typeof window !== 'undefined' && !!window.storage);
+
+  async function loadKey(key, fallback){
+    if(hasClaudeStorage){
+      try{
+        const res = await window.storage.get(key, false);
+        if(res && res.value){ return JSON.parse(res.value); }
+        return fallback;
+      }catch(e){ /* fall through to localStorage */ }
+    }
+    try{
+      const raw = localStorage.getItem(key);
+      return raw ? JSON.parse(raw) : fallback;
+    }catch(e){
+      return fallback;
+    }
+  }
+
+  async function saveKey(key, value){
+    if(hasClaudeStorage){
+      try{
+        await window.storage.set(key, JSON.stringify(value), false);
+        return;
+      }catch(e){ /* fall through to localStorage */ }
+    }
+    try{
+      localStorage.setItem(key, JSON.stringify(value));
+    }catch(e){
+      console.error('Save failed for', key, e);
+    }
+  }
+
+  // ---------- Init ----------
+  async function init(){
+    const today = new Date();
+    $('#todayLabel').textContent = today.toLocaleDateString(undefined, { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+
+    buildSwatches();
+    bindTabs();
+    bindJournal();
+    bindTasks();
+    bindCalendar();
+
+    notes = await loadKey('journal:entries', []);
+    $('#journalStatus').style.display = 'none';
+    renderNotes();
+
+    tasks = await loadKey('tasks:list', []);
+    $('#tasksStatus').style.display = 'none';
+    renderTasks();
+
+    events = await loadKey('calendar:events', {});
+    $('#calStatus').style.display = 'none';
+    renderCalendar();
+  }
+
+  // ---------- Tabs ----------
+  function bindTabs(){
+    $$('nav.tabs button').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        $$('nav.tabs button').forEach(b=>b.classList.remove('active'));
+        btn.classList.add('active');
+        $$('section.view').forEach(v=>v.classList.remove('active'));
+        $('#view-'+btn.dataset.view).classList.add('active');
+      });
+    });
+  }
+
+  // ---------- Journal ----------
+  function buildSwatches(){
+    const wrap = $('#swatches');
+    NOTE_COLORS.forEach((c,i)=>{
+      const sw = document.createElement('div');
+      sw.className = 'swatch' + (i===0 ? ' selected' : '');
+      sw.style.background = c;
+      sw.addEventListener('click', ()=>{
+        selectedColor = c;
+        $$('.swatch', wrap).forEach(s=>s.classList.remove('selected'));
+        sw.classList.add('selected');
+      });
+      wrap.appendChild(sw);
+    });
+  }
+
+  function bindJournal(){
+    $('#addNoteBtn').addEventListener('click', saveNote);
+
+    // Title field: Enter moves down into the body instead of submitting,
+    // since a title alone is rarely the whole thought.
+    $('#noteTitle').addEventListener('keydown', (e)=>{
+      if(e.key === 'Enter'){
+        e.preventDefault();
+        $('#noteBody').focus();
+      }
+    });
+
+    // Body field: Enter saves the note, Shift+Enter inserts a real line break.
+    $('#noteBody').addEventListener('keydown', (e)=>{
+      if(e.key === 'Enter' && !e.shiftKey){
+        e.preventDefault();
+        saveNote();
+      }
+    });
+  }
+
+  async function saveNote(){
+    const title = $('#noteTitle').value.trim();
+    const body = $('#noteBody').value.trim();
+    if(!title && !body) return;
+    notes.unshift({ id: uid(), title, body, color: selectedColor, created: Date.now() });
+    $('#noteTitle').value = '';
+    $('#noteBody').value = '';
+    $('#noteTitle').focus();
+    renderNotes();
+    await saveKey('journal:entries', notes);
+  }
+
+  function renderNotes(){
+    const grid = $('#notesGrid');
+    grid.innerHTML = '';
+    if(notes.length === 0){
+      grid.innerHTML = '<div class="empty">No notes yet — write your first thought above.</div>';
+      return;
+    }
+    notes.forEach(note=>{
+      const card = document.createElement('div');
+      card.className = 'note-card';
+      card.style.background = note.color || '#FFFDF8';
+      const dateStr = new Date(note.created).toLocaleDateString(undefined, {month:'short', day:'numeric'});
+      card.innerHTML = `
+        ${note.title ? `<h3></h3>` : ''}
+        <p></p>
+        <div class="meta"><span>${dateStr}</span><button title="Delete">Delete</button></div>
+      `;
+      if(note.title) card.querySelector('h3').textContent = note.title;
+      card.querySelector('p').textContent = note.body;
+      card.querySelector('button').addEventListener('click', async ()=>{
+        notes = notes.filter(n=>n.id !== note.id);
+        renderNotes();
+        await saveKey('journal:entries', notes);
+      });
+      grid.appendChild(card);
+    });
+  }
+
+  // ---------- Tasks ----------
+  function bindTasks(){
+    $('#addTaskBtn').addEventListener('click', addTask);
+    $('#taskInput').addEventListener('keydown', (e)=>{ if(e.key === 'Enter') addTask(); });
+    $$('.task-filters button').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        $$('.task-filters button').forEach(b=>b.classList.remove('active'));
+        btn.classList.add('active');
+        taskFilter = btn.dataset.filter;
+        renderTasks();
+      });
+    });
+  }
+
+  async function addTask(){
+    const text = $('#taskInput').value.trim();
+    if(!text) return;
+    const due = $('#taskDate').value || null;
+    tasks.push({ id: uid(), text, due, done:false, created: Date.now() });
+    $('#taskInput').value = '';
+    $('#taskDate').value = '';
+    renderTasks();
+    await saveKey('tasks:list', tasks);
+  }
+
+  function renderTasks(){
+    const list = $('#taskList');
+    list.innerHTML = '';
+    let visible = tasks;
+    if(taskFilter === 'active') visible = tasks.filter(t=>!t.done);
+    if(taskFilter === 'done') visible = tasks.filter(t=>t.done);
+
+    if(visible.length === 0){
+      list.innerHTML = '<div class="empty">Nothing here yet.</div>';
+      return;
+    }
+
+    visible.forEach(task=>{
+      const li = document.createElement('li');
+      li.className = 'task' + (task.done ? ' done' : '');
+      li.innerHTML = `
+        <div class="check">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M4 12l5 5L20 6" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <div class="body">
+          <div class="title"></div>
+          ${task.due ? `<div class="due"></div>` : ''}
+        </div>
+        <button class="remove" title="Delete">&times;</button>
+      `;
+      li.querySelector('.title').textContent = task.text;
+      if(task.due){
+        li.querySelector('.due').textContent = 'Due ' + new Date(task.due + 'T00:00').toLocaleDateString(undefined, {month:'short', day:'numeric'});
+      }
+      li.querySelector('.check').addEventListener('click', async ()=>{
+        task.done = !task.done;
+        renderTasks();
+        await saveKey('tasks:list', tasks);
+      });
+      li.querySelector('.remove').addEventListener('click', async ()=>{
+        tasks = tasks.filter(t=>t.id !== task.id);
+        renderTasks();
+        await saveKey('tasks:list', tasks);
+      });
+      list.appendChild(li);
+    });
+  }
+
+  // ---------- Calendar ----------
+  function bindCalendar(){
+    $('#prevMonth').addEventListener('click', ()=>{
+      calDate.setMonth(calDate.getMonth()-1);
+      selectedDay = null;
+      $('#dayPanel').style.display = 'none';
+      renderCalendar();
+    });
+    $('#nextMonth').addEventListener('click', ()=>{
+      calDate.setMonth(calDate.getMonth()+1);
+      selectedDay = null;
+      $('#dayPanel').style.display = 'none';
+      renderCalendar();
+    });
+    $('#dayItemAddBtn').addEventListener('click', addDayItem);
+    $('#dayItemInput').addEventListener('keydown', (e)=>{ if(e.key==='Enter') addDayItem(); });
+  }
+
+  function renderCalendar(){
+    $('#calMonthLabel').textContent = calDate.toLocaleDateString(undefined, { month:'long', year:'numeric' });
+    const grid = $('#calGrid');
+    grid.innerHTML = '';
+
+    ['S','M','T','W','T','F','S'].forEach(d=>{
+      const el = document.createElement('div');
+      el.className = 'cal-dow';
+      el.textContent = d;
+      grid.appendChild(el);
+    });
+
+    const year = calDate.getFullYear();
+    const month = calDate.getMonth();
+    const firstDay = new Date(year, month, 1).getDay();
+    const daysInMonth = new Date(year, month+1, 0).getDate();
+    const today = new Date();
+
+    for(let i=0;i<firstDay;i++){
+      const el = document.createElement('div');
+      el.className = 'cal-day empty-day';
+      grid.appendChild(el);
+    }
+
+    for(let day=1; day<=daysInMonth; day++){
+      const thisDate = new Date(year, month, day);
+      const key = dateKey(thisDate);
+      const isToday = thisDate.toDateString() === today.toDateString();
+      const el = document.createElement('div');
+      el.className = 'cal-day' + (isToday ? ' today' : '');
+      const dayEvents = events[key] || [];
+      el.innerHTML = `<div class="num">${day}</div><div class="dots">${dayEvents.slice(0,4).map(()=>'<div class="dot"></div>').join('')}</div>`;
+      el.addEventListener('click', ()=>{
+        selectedDay = key;
+        openDayPanel(thisDate, key);
+      });
+      grid.appendChild(el);
+    }
+  }
+
+  function openDayPanel(dateObj, key){
+    $('#dayPanel').style.display = 'block';
+    $('#dayPanelTitle').textContent = dateObj.toLocaleDateString(undefined, { weekday:'long', month:'long', day:'numeric' });
+    renderDayItems(key);
+    $('#dayPanel').scrollIntoView({behavior:'smooth', block:'nearest'});
+  }
+
+  function renderDayItems(key){
+    const list = $('#dayItemsList');
+    list.innerHTML = '';
+    const items = events[key] || [];
+    if(items.length === 0){
+      list.innerHTML = '<div class="empty">Nothing planned for this day.</div>';
+      return;
+    }
+    items.forEach(item=>{
+      const li = document.createElement('li');
+      li.className = 'day-item';
+      li.innerHTML = `<span></span><button>&times;</button>`;
+      li.querySelector('span').textContent = item.text;
+      li.querySelector('button').addEventListener('click', async ()=>{
+        events[key] = events[key].filter(i=>i.id !== item.id);
+        if(events[key].length === 0) delete events[key];
+        renderDayItems(key);
+        renderCalendar();
+        await saveKey('calendar:events', events);
+      });
+      list.appendChild(li);
+    });
+  }
+
+  async function addDayItem(){
+    if(!selectedDay) return;
+    const input = $('#dayItemInput');
+    const text = input.value.trim();
+    if(!text) return;
+    if(!events[selectedDay]) events[selectedDay] = [];
+    events[selectedDay].push({ id: uid(), text });
+    input.value = '';
+    renderDayItems(selectedDay);
+    renderCalendar();
+    await saveKey('calendar:events', events);
+  }
+
+  init();
+
+  if('serviceWorker' in navigator){
+    window.addEventListener('load', ()=>{
+      navigator.serviceWorker.register('./sw.js').catch(()=>{ /* fine if unsupported, e.g. inside Claude preview */ });
+    });
+  }
+})();
+</script>
+</body>
+</html>
